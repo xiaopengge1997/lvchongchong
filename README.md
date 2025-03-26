@@ -1,2 +1,0 @@
-# aichat
-ai product
