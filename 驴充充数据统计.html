@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>驴充充数据统计</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#3b82f6',
+            secondary: '#64748b',
+            accent: '#0ea5e9',
+            success: '#10b981',
+            warning: '#f59e0b',
+            danger: '#ef4444',
+            dark: '#1e293b',
+            light: '#f8fafc'
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+
+      .card-shadow {
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      }
+
+      .hover-scale {
+        transition: transform 0.2s ease-in-out;
+      }
+
+      .hover-scale:hover {
+        transform: scale(1.02);
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-gray-50 min-h-screen">
+  <header class="bg-gradient-to-r from-primary to-accent text-white shadow-lg">
+    <div class="container mx-auto px-4 py-6">
+      <h1 class="text-[clamp(1.8rem,4vw,2.5rem)] font-bold tracking-tight">
+        <i class="fa fa-bar-chart mr-3"></i>驴充充数据可视化报表
+      </h1>
+      <p class="text-lg mt-2 opacity-90">页面浏览与贷款申请统计分析</p>
+    </div>
+  </header>
+  <main class="container mx-auto px-4 py-8">
+    <!-- 筛选区域 -->
+    <section class="bg-white rounded-xl p-6 mb-8 card-shadow hover-scale">
+      <h2 class="text-xl font-bold mb-4 text-dark flex items-center">
+        <i class="fa fa-filter text-primary mr-2"></i>数据筛选
+      </h2>
+      <form id="queryForm" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="space-y-2">
+            <label for="startDate" class="block text-sm font-medium text-gray-700">
+              <i class="fa fa-calendar-o mr-1"></i>开始日期
+            </label>
+            <input type="date" id="startDate" name="startDate"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+              value="">
+          </div>
+          <div class="space-y-2">
+            <label for="endDate" class="block text-sm font-medium text-gray-700">
+              <i class="fa fa-calendar-o mr-1"></i>结束日期
+            </label>
+            <input type="date" id="endDate" name="endDate"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+              value="">
+          </div>
+        </div>
+        <div class="flex justify-end">
+          <button type="button" id="queryBtn"
+            class="bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded-lg shadow-md transition-all flex items-center">
+            <i class="fa fa-search mr-2"></i>查询数据
+          </button>
+        </div>
+      </form>
+    </section>
+    <!-- 数据概览 -->
+    <section class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div class="bg-white rounded-xl p-6 card-shadow hover-scale">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-bold text-dark flex items-center">
+            <i class="fa fa-eye text-primary mr-2"></i>页面浏览量
+          </h2>
+          <span id="totalPageViews" class="text-2xl font-bold text-primary">-</span>
+        </div>
+        <div class="h-64">
+          <canvas id="pageViewChart"></canvas>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl p-6 card-shadow hover-scale">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-bold text-dark flex items-center">
+            <i class="fa fa-file-text-o text-accent mr-2"></i>贷款申请量
+          </h2>
+          <span id="totalLoanApplications" class="text-2xl font-bold text-accent">-</span>
+        </div>
+        <div class="h-64">
+          <canvas id="loanApplicationChart"></canvas>
+        </div>
+      </div>
+    </section>
+    <!-- 详细数据 -->
+    <section class="bg-white rounded-xl p-6 card-shadow hover-scale">
+      <div class="flex items-center mb-4">
+        <h2 class="text-xl font-bold text-dark flex items-center">
+          <i class="fa fa-table text-primary mr-2"></i>详细数据
+        </h2>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th scope="col"
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期</th>
+              <th scope="col"
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">页面浏览量</th>
+              <th scope="col"
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">贷款申请量</th>
+            </tr>
+          </thead>
+          <tbody id="dataTableBody" class="bg-white divide-y divide-gray-200">
+            <!-- 数据将通过JavaScript动态填充 -->
+            <tr class="text-center">
+              <td colspan="3" class="px-6 py-12 text-gray-500">
+                <div class="flex flex-col items-center">
+                  <i class="fa fa-bar-chart text-5xl opacity-30 mb-3"></i>
+                  <p>请点击"查询数据"按钮获取数据</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="tableLoading" class="hidden mt-4 text-center text-gray-500">
+        <i class="fa fa-spinner fa-spin mr-2"></i>数据加载中...
+      </div>
+      <div id="errorMessage" class="hidden mt-4 text-center text-red-500 font-medium"></div>
+    </section>
+  </main>
+  <footer class="bg-dark text-white mt-12">
+    <div class="container mx-auto px-4 py-8">
+      <div class="flex flex-col md:flex-row justify-between items-center">
+        <div class="mb-4 md:mb-0">
+          <h3 class="text-xl font-bold">数据可视化报表</h3>
+          <p class="text-gray-400 mt-1">© 2025 版权所有</p>
+        </div>
+        <div class="flex space-x-4">
+          <a href="#" class="text-gray-400 hover:text-white transition-colors">
+            <i class="fa fa-question-circle"></i> 帮助中心
+          </a>
+          <a href="#" class="text-gray-400 hover:text-white transition-colors">
+            <i class="fa fa-envelope"></i> 联系我们
+          </a>
+          <a href="#" class="text-gray-400 hover:text-white transition-colors">
+            <i class="fa fa-shield"></i> 隐私政策
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+  <script>
+    // 初始化图表
+    const pageViewCtx = document.getElementById('pageViewChart').getContext('2d');
+    const loanApplicationCtx = document.getElementById('loanApplicationChart').getContext('2d');
+
+    let pageViewChart = new Chart(pageViewCtx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: '页面浏览量',
+          data: [],
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          borderWidth: 2,
+          tension: 0.3,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            callbacks: {
+              label: function (context) {
+                return `页面浏览量: ${context.raw}`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: {
+              display: false
+            }
+          },
+          y: {
+            beginAtZero: true,
+            grid: {
+              color: 'rgba(0, 0, 0, 0.05)'
+            }
+          }
+        }
+      }
+    });
+    let loanApplicationChart = new Chart(loanApplicationCtx, {
+      type: 'bar',
+      data: {
+        labels: [],
+        datasets: [{
+          label: '贷款申请量',
+          data: [],
+          backgroundColor: '#0ea5e9',
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            callbacks: {
+              label: function (context) {
+                return `贷款申请量: ${context.raw}`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: {
+              display: false
+            }
+          },
+          y: {
+            beginAtZero: true,
+            grid: {
+              color: 'rgba(0, 0, 0, 0.05)'
+            }
+          }
+        }
+      }
+    });
+
+    // 查询按钮点击事件
+    document.getElementById('queryBtn').addEventListener('click', async function () {
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+      const errorMessageEl = document.getElementById('errorMessage');
+
+      if (!startDate || !endDate) {
+        alert('请选择开始日期和结束日期');
+        return;
+      }
+
+      // 重置状态
+      errorMessageEl.classList.add('hidden');
+      document.getElementById('tableLoading').classList.remove('hidden');
+      document.getElementById('dataTableBody').innerHTML = '';
+
+      try {
+        // 构造请求体
+        const requestBody = {
+          start_date: startDate,
+          end_date: endDate
+        };
+
+        // 发送POST请求
+        const response = await fetch('http://101.37.30.154:2000/predict', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+          let errorText = `请求失败: ${response.status} ${response.statusText}`;
+          try {
+            const errorData = await response.json();
+            errorText += ` - ${errorData.message || '参数错误'}`;
+          } catch { /* 忽略解析错误 */ }
+          throw new Error(errorText);
+        }
+
+        // 直接解析Python风格的单引号JSON
+        let data = await response.text();
+        try {
+          data = eval(data); // 直接用eval解析Python风格的数组对象
+        } catch (e) {
+          throw new Error('返回数据格式错误，无法解析');
+        }
+
+        if (!Array.isArray(data) || data.length === 0) {
+          throw new Error('返回数据格式错误，未获取到有效数据');
+        }
+
+        // 分离总计行（假设最后一行是总计）
+        const totalRow = data.length > 0 ? data[data.length - 1] : null;
+        const nonTotalData = data.slice(0, data.length - 1); // 非总计行数据，用于图表
+
+        updateCharts(nonTotalData); // 图表使用非总计行数据
+        updateTable(data); // 表格显示所有数据（包括总计行）
+        updateSummary(totalRow); // 汇总值使用总计行数据
+
+      } catch (error) {
+        console.error('请求异常:', error);
+        errorMessageEl.textContent = `获取数据失败: ${error.message}`;
+        errorMessageEl.classList.remove('hidden');
+      } finally {
+        document.getElementById('tableLoading').classList.add('hidden');
+      }
+    });
+
+    // 更新图表（使用非总计行数据）
+    function updateCharts(nonTotalData) {
+      const labels = nonTotalData.map(item => item.event_date);
+      const pageViewData = nonTotalData.map(item => parseInt(item.page_view_lvchong_h5_count, 10));
+      const loanApplicationData = nonTotalData.map(item => parseInt(item.submit_car_loan_lgk_count, 10));
+
+      // 更新页面浏览量图表
+      pageViewChart.data.labels = labels;
+      pageViewChart.data.datasets[0].data = pageViewData;
+      pageViewChart.update();
+
+      // 更新贷款申请量图表
+      loanApplicationChart.data.labels = labels;
+      loanApplicationChart.data.datasets[0].data = loanApplicationData;
+      loanApplicationChart.update();
+    }
+
+    // 更新表格（显示所有数据，包括总计行）
+    function updateTable(allData) {
+      const tableBody = document.getElementById('dataTableBody');
+      tableBody.innerHTML = '';
+
+      allData.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.className = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+
+        const dateCell = document.createElement('td');
+        dateCell.className = 'px-6 py-4 whitespace-nowrap text-sm';
+        dateCell.textContent = item.event_date;
+        row.appendChild(dateCell);
+
+        const pageViewCell = document.createElement('td');
+        pageViewCell.className = 'px-6 py-4 whitespace-nowrap text-sm';
+        pageViewCell.textContent = item.page_view_lvchong_h5_count;
+        row.appendChild(pageViewCell);
+
+        const loanAppCell = document.createElement('td');
+        loanAppCell.className = 'px-6 py-4 whitespace-nowrap text-sm';
+        loanAppCell.textContent = item.submit_car_loan_lgk_count;
+        row.appendChild(loanAppCell);
+
+        tableBody.appendChild(row);
+      });
+    }
+
+    // 更新概览数据（使用总计行数据）
+    function updateSummary(totalRow) {
+      if (totalRow) {
+        const totalPageViews = parseInt(totalRow.page_view_lvchong_h5_count, 10);
+        const totalLoanApplications = parseInt(totalRow.submit_car_loan_lgk_count, 10);
+
+        document.getElementById('totalPageViews').textContent = totalPageViews;
+        document.getElementById('totalLoanApplications').textContent = totalLoanApplications;
+      } else {
+        document.getElementById('totalPageViews').textContent = '-';
+        document.getElementById('totalLoanApplications').textContent = '-';
+      }
+    }
+  </script>
+</body>
+
+</html>
